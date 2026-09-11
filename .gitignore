@@ -1,0 +1,8 @@
+# Create the .gitignore file
+New-Item -Path .gitignore -ItemType File -Force
+
+# Add common Python temporary patterns to it
+Add-Content .gitignore "__pycache__/"
+Add-Content .gitignore "*.pyc"
+Add-Content .gitignore "venv/"
+Add-Content .gitignore ".vscode/"
