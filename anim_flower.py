@@ -1,69 +1,96 @@
 import math
 
+# 11x11 Pixel Art Frames: Rose/Tulip on a Stem with Leaves
+# ' ' = Dark background
+# 'G' = Stem / Leaf Green
+# 'd' = Dark Leaf Shadow
+# 'R' = Ruby Red Petal Base
+# 'P' = Vibrant Rose/Pink Petal
+# 'Y' = Petal Highlight
+
+FRAME_CENTER = [
+    "           ",
+    "   P P P   ",
+    "  RPPYPPR  ",
+    "  RPPPPRR  ",
+    "   RPPRR   ",
+    "     G     ",
+    "     Gg    ",
+    "  GGGGGGG  ",
+    "   dGGGd   ",
+    "     G     ",
+    "     G     "
+]
+
+FRAME_SWAY_RIGHT = [
+    "           ",
+    "    P P P  ",
+    "   RPPYPPR ",
+    "   RPPPPRR ",
+    "    RPPRR  ",
+    "     GG    ",
+    "     Gg    ",
+    "  GGGGGGG  ",
+    "   dGGGd   ",
+    "     G     ",
+    "     G     "
+]
+
+FRAME_SWAY_LEFT = [
+    "           ",
+    "  P P P    ",
+    " RPPYPPR   ",
+    " RPPPPRR   ",
+    "  RPPRR    ",
+    "    GG     ",
+    "     Gg    ",
+    "  GGGGGGG  ",
+    "   dGGGd   ",
+    "     G     ",
+    "     G     "
+]
+
+FRAMES = [FRAME_CENTER, FRAME_SWAY_RIGHT, FRAME_CENTER, FRAME_SWAY_LEFT]
+
 class Animation:
     def __init__(self, size):
         self.size = size
-        self.fps = 12
-        self.frame_count = 0
-        
-        # Stem Toggle (Set to True if you want a green stem at the bottom)
-        self.show_stem = False
+        self.fps = 8
+        self.tick_count = 0
 
     def get_next_frame(self):
-        # Dark panel background
-        buffer = [[(5, 5, 12) for _ in range(self.size)] for _ in range(self.size)]
-        
-        # Matrix center at (5, 5)
-        cx, cy = self.size // 2, self.size // 2
-        
-        self.frame_count += 1
-        t = self.frame_count * 0.1
+        # Advance sway animation frame every 5 clock cycles
+        self.tick_count += 1
+        frame_idx = (self.tick_count // 5) % len(FRAMES)
+        art = FRAMES[frame_idx]
 
-        # Blooming expansion cycle (grows outward, breathes, then contracts)
-        bloom = (math.sin(t * 0.6) + 1.0) / 2.0  # Range 0.0 to 1.0
-        max_r = 1.2 + bloom * 3.4                # Maximum reach across the 11x11 grid
+        # Subtle dynamic shimmer for petal highlights
+        shimmer = (math.sin(self.tick_count * 0.2) + 1.0) / 2.0
 
-        petal_count = 4
-        rotation_angle = t * 0.08  # Gentle organic rotation
+        # Color palette definition
+        bg_color = (8, 12, 22)
+        green_stem = (35, 185, 60)
+        green_dark = (18, 110, 35)
+        petal_ruby = (200, 20, 65)
+        petal_pink = (255, 60 + int(30 * shimmer), 135)
+        petal_high = (255, 180 + int(40 * shimmer), 195)
 
-        # 1. Render 4-Petal Flower Body
+        color_map = {
+            ' ': bg_color,
+            'G': green_stem,
+            'g': green_stem,
+            'd': green_dark,
+            'R': petal_ruby,
+            'P': petal_pink,
+            'Y': petal_high
+        }
+
+        # Build matrix buffer
+        buffer = [[bg_color for _ in range(self.size)] for _ in range(self.size)]
+
         for y in range(self.size):
             for x in range(self.size):
-                dx = x - cx
-                dy = y - cy
-                dist = math.sqrt(dx * dx + dy * dy)
-
-                if 0.5 < dist <= max_r + 0.5:
-                    angle = math.atan2(dy, dx) + rotation_angle
-                    
-                    # 4-petal mathematical wave function (peaks at 4 primary axes)
-                    petal_factor = 0.5 + 0.5 * math.cos(petal_count * angle)
-                    allowed_r = max_r * (0.30 + 0.70 * petal_factor)
-
-                    if dist <= allowed_r:
-                        # Color gradient: vibrant ruby red at core to bright orchid pink at tips
-                        norm_dist = dist / max_r
-                        r_col = min(255, int(220 + norm_dist * 35))
-                        g_col = min(255, int(25 + norm_dist * 80))
-                        b_col = min(255, int(110 + norm_dist * 100))
-
-                        buffer[y][x] = (r_col, g_col, b_col)
-
-        # 2. Central Pistil (Gold Center)
-        buffer[cy][cx] = (255, 215, 0)
-
-        # Pulsing center glow
-        halo_pulse = (math.sin(t * 1.5) + 1.0) / 2.0
-        glow_intensity = int(130 + 80 * halo_pulse)
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-            nx, ny = cx + dx, cy + dy
-            if 0 <= nx < self.size and 0 <= ny < self.size:
-                if buffer[ny][nx] == (5, 5, 12):  # Fill surrounding background
-                    buffer[ny][nx] = (glow_intensity, int(glow_intensity * 0.6), 0)
-
-        # 3. Optional Stem
-        if self.show_stem:
-            for y in range(cy + 2, self.size):
-                buffer[y][cx] = (20, 160, 30)
+                char = art[y][x]
+                buffer[y][x] = color_map.get(char, bg_color)
 
         return buffer
