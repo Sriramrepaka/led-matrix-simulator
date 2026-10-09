@@ -13,6 +13,9 @@ class Animation:
         self.stars = []
         self.tick_count = 0
         
+        # Ship hit impact flash timer
+        self.ship_hit_timer = 0
+        
         # AI decision state ("hit" vs "dodge")
         self.ai_mode = "hit"
         self.ai_timer = 0
@@ -55,7 +58,7 @@ class Animation:
                 'speed': random.uniform(0.2, 0.35)
             })
 
-        # 3. AI Movement Logic (Dodging a few & hitting a few)
+        # 3. AI Movement Logic
         if abs(self.tilt_x) > 0.05:
             # Interactive manual slider override
             self.player_x += self.tilt_x * 0.75
@@ -89,12 +92,12 @@ class Animation:
                         dodge_dir = 1.0 if self.player_x < (self.size / 2) else -1.0
                         self.player_x += dodge_dir * 0.4
             else:
-                # Gentle breathing float when space is clear
                 self.player_x += math.sin(self.tick_count * 0.2) * 0.15
 
         # Keep ship inside grid bounds
         self.player_x = max(1.0, min(float(self.size - 2), self.player_x))
         px = int(round(self.player_x))
+        py = self.size - 1  # Base row of ship
 
         # 4. Auto-Fire Defense Lasers
         if self.ai_mode == "hit" and self.tick_count % 3 == 0:
@@ -118,7 +121,7 @@ class Animation:
                     hit_bullets.add(b_idx)
                     hit_asteroids.add(a_idx)
                     
-                    # Particle explosion burst
+                    # Particle explosion burst for laser hit
                     p_color = (255, 130, 20) if ast['is_orange'] else (240, 240, 255)
                     for _ in range(5):
                         self.explosions.append({
@@ -130,15 +133,40 @@ class Animation:
                         })
                     break
 
+        # 7. Ship-Asteroid Direct Collision Detection & Burst Effect
+        ship_coords = [(px, py - 1), (px - 1, py), (px, py), (px + 1, py)]
+        
+        for a_idx, ast in enumerate(self.asteroids):
+            if a_idx in hit_asteroids:
+                continue
+            ax, ay = int(round(ast['x'])), int(round(ast['y']))
+            if (ax, ay) in ship_coords:
+                hit_asteroids.add(a_idx)
+                self.ship_hit_timer = 4  # Trigger ship flash effect for 4 frames
+                
+                # Multi-directional shockwave burst particles
+                burst_colors = [(255, 50, 50), (255, 200, 40), (255, 255, 255), (0, 240, 255)]
+                for _ in range(10):
+                    angle = random.uniform(0, 2 * math.pi)
+                    spd = random.uniform(0.3, 0.85)
+                    self.explosions.append({
+                        'x': float(ax),
+                        'y': float(ay),
+                        'vx': math.cos(angle) * spd,
+                        'vy': math.sin(angle) * spd,
+                        'life': 1.2,
+                        'color': random.choice(burst_colors)
+                    })
+
         self.bullets = [b for i, b in enumerate(self.bullets) if i not in hit_bullets]
         self.asteroids = [a for i, a in enumerate(self.asteroids) if i not in hit_asteroids and a['y'] < self.size]
 
-        # 7. Render Particle Explosions
+        # 8. Render Particle Explosions
         active_exp = []
         for p in self.explosions:
             p['x'] += p['vx']
             p['y'] += p['vy']
-            p['life'] -= 0.25
+            p['life'] -= 0.2
             if p['life'] > 0:
                 ex, ey = int(round(p['x'])), int(round(p['y']))
                 if 0 <= ex < self.size and 0 <= ey < self.size:
@@ -149,31 +177,40 @@ class Animation:
                 active_exp.append(p)
         self.explosions = active_exp
 
-        # 8. Render White and Orange Asteroids
+        # 9. Render White and Orange Asteroids
         for ast in self.asteroids:
             ax, ay = int(round(ast['x'])), int(round(ast['y']))
             if 0 <= ax < self.size and 0 <= ay < self.size:
                 if ast['is_orange']:
-                    buffer[ay][ax] = (255, 120, 20)  # Burning Orange Asteroid
+                    buffer[ay][ax] = (255, 120, 20)
                 else:
-                    buffer[ay][ax] = (235, 235, 245)  # Crisp White Asteroid
+                    buffer[ay][ax] = (235, 235, 245)
 
-        # 9. Render Cyan Defense Lasers
+        # 10. Render Cyan Defense Lasers
         for bx, by in self.bullets:
             if 0 <= bx < self.size and 0 <= by < self.size:
                 buffer[by][bx] = (0, 240, 255)
 
-        # 10. Render AstroBot Shape ".:." (Navy Blue Triangle)
-        py = self.size - 1  # Base row
-        navy_dark = (0, 35, 140)
-        navy_core = (0, 110, 240)
+        # 11. Render AstroBot Shape ".:." with Hit Burst Colors
+        if self.ship_hit_timer > 0:
+            self.ship_hit_timer -= 1
+            # Flashing white/red impact effect when hit by an asteroid
+            if self.ship_hit_timer % 2 == 1:
+                c_tip, c_wing, c_core = (255, 255, 255), (255, 180, 40), (255, 50, 50)
+            else:
+                c_tip, c_wing, c_core = (255, 50, 50), (255, 255, 255), (255, 200, 40)
+        else:
+            # Standard Navy Blue palette
+            c_tip = (0, 35, 140)
+            c_wing = (0, 35, 140)
+            c_core = (0, 110, 240)
 
         # Top Tip '.'
-        buffer[py - 1][px] = navy_dark
+        buffer[py - 1][px] = c_tip
 
         # Base Row '.:.'
-        buffer[py][px - 1] = navy_dark  # Left wing '.'
-        buffer[py][px]     = navy_core  # Center core ':'
-        buffer[py][px + 1] = navy_dark  # Right wing '.'
+        buffer[py][px - 1] = c_wing  # Left wing '.'
+        buffer[py][px]     = c_core  # Center core ':'
+        buffer[py][px + 1] = c_wing  # Right wing '.'
 
         return buffer
